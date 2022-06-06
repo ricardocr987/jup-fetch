@@ -1,8 +1,9 @@
 {
     "name": "jup-fetch",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "description": "Optimization of the fetching of Jup API using bun",
     "main": "index.js",
+    "types": "index.d.ts",
     "scripts": {
       "clean:all": "rm -rf ./node_modules && rm -rf ./dist && rm -rf package-lock.json",
       "run:script": "npm run clean:all && bun install && bun run build && node index.js",

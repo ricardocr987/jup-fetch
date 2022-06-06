@@ -1,4 +1,4 @@
-export async function getCoinQuote(inputMint, outputMint, amount) {
+async function getCoinQuote(inputMint, outputMint, amount) {
   const options = {
     method: "get",
   };
@@ -12,7 +12,7 @@ export async function getCoinQuote(inputMint, outputMint, amount) {
   return response;
 }
 
-export async function getTransaction(route, wallet) {
+async function getTransaction(route, wallet) {
   const data = {
     route: route,
     userPublicKey: wallet.publicKey.toString(),
@@ -33,3 +33,5 @@ export async function getTransaction(route, wallet) {
 
   return { setupTransaction, swapTransaction, cleanupTransaction };
 }
+
+module.exports = { getCoinQuote, getTransaction };

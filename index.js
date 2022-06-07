@@ -27,7 +27,7 @@ async function getTransaction(route, pubkey) {
     await fetch("https://quote-api.jup.ag/v1/swap", options)
   ).json();
 
-  return data;
+  return response;
 }
 
 module.exports = { getCoinQuote, getTransaction };

@@ -1,6 +1,6 @@
 {
     "name": "jup-fetch",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Optimization of the fetching of Jup API using bun",
     "main": "index.js",
     "types": "index.d.ts",

@@ -12,10 +12,10 @@ async function getCoinQuote(inputMint, outputMint, amount) {
   return response;
 }
 
-async function getTransaction(route, wallet) {
+async function getTransaction(route, pubkey) {
   const data = {
     route: route,
-    userPublicKey: wallet.publicKey.toString(),
+    userPublicKey: pubkey,
     // to make sure it doesnt close the sol account
     wrapUnwrapSOL: "false",
   };

@@ -13,21 +13,21 @@ async function getCoinQuote(inputMint, outputMint, amount) {
 }
 
 async function getTransaction(route, pubkey) {
-  const data = {
-    route: route,
-    userPublicKey: pubkey,
-    // to make sure it doesnt close the sol account
-    wrapUnwrapSOL: "false",
-  };
-  const options = {
-    method: "post",
-    headers: data,
-  };
-  const response = await (
-    await fetch("https://quote-api.jup.ag/v1/swap", options)
+  return await (
+    await fetch("https://quote-api.jup.ag/v1/swap", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        // route from /quote api
+        route: route,
+        // user public key to be used for the swap
+        userPublicKey: pubkey,
+        wrapUnwrapSOL: false,
+      }),
+    })
   ).json();
-
-  return response;
 }
 
 module.exports = { getCoinQuote, getTransaction };

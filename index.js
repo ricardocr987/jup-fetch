@@ -4,12 +4,12 @@ async function getCoinQuote(inputMint, outputMint, amount) {
   };
   const response = await (
     await fetch(
-      `https://quote-api.jup.ag/v1/quote?outputMint=${outputMint}&inputMint=${inputMint}&amount=${amount}&slippage=0.2`,
+      `https://quote-api.jup.ag/v1/quote?outputMint=${outputMint}&inputMint=${inputMint}&amount=${amount}&swapMode=ExactIn&slippage=0&feeBps=0&onlyDirectRoutes=fals`,
       options
     )
   ).json();
 
-  return response;
+  return response.data[0];
 }
 
 async function getTransaction(route, pubkey) {

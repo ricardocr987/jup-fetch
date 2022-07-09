@@ -1,23 +1,31 @@
 {
-    "name": "jup-fetch",
-    "version": "0.1.6",
-    "description": "Optimization of the fetching of Jup API using bun",
-    "main": "index.js",
-    "types": "index.d.ts",
-    "scripts": {
-      "clean:all": "rm -rf ./node_modules && rm -rf ./dist && rm -rf package-lock.json",
-      "run:script": "npm run clean:all && bun install && bun run build && node index.js",
-      "build": "rimraf dist && tsc -p tsconfig.json"
-     },
-     "repository": {
-         "type": "git",
-         "url": "https://github.com/ricardocr987/jup-fetch"
-     },
-    "author": "Riki",
-    "private": false,
-    "publishConfig": {
-      "access": "public",
-      "registry": "https://registry.npmjs.org"
-    }
+  "name": "jup-fetch",
+  "version": "0.1.7",
+  "description": "Optimization of the fetching of Jup API using bun",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "clean:all": "rm -rf ./node_modules && rm -rf ./dist && rm -rf package-lock.json",
+    "run:script": "npm run clean:all && bun install && bun run build && node index.js",
+    "build": "rimraf dist && tsc -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ricardocr987/jup-fetch"
+  },
+  "author": "Riki",
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.1.8",
+    "@solana/web3.js": "^1.44.3",
+    "bs58": "^5.0.0",
+    "got": "^12.0.1",
+    "net": "^1.0.2",
+    "promise-retry": "^2.0.1",
+    "tls": "^0.0.1"
   }
-  
+}

@@ -31,7 +31,7 @@ async function getQuotes(): Promise<[DataQuote, DataQuote]> {
       options
     )
   ).json();
-  
+
   const solToUsdc: QuoteResponse = await (
     await fetch(
       `https://quote-api.jup.ag/v1/quote?outputMint=${USDC_MINT}&inputMint=${SOL_MINT}&amount=${usdcToSol.data[0].outAmount}&slippage=0.2`,
@@ -39,7 +39,7 @@ async function getQuotes(): Promise<[DataQuote, DataQuote]> {
     )
   ).json();
 
-  console.log("Output: " + solToUsdc.data[0].outAmount + " | Time taken: " + solToUsdc.timeTaken);
+  console.log("Output: " + solToUsdc.data[0].outAmount + " | Market: " + solToUsdc.data[0].marketInfos[0].label + " | Time taken: " + solToUsdc.timeTaken);
 
   return [ usdcToSol.data[0], solToUsdc.data[0] ];
 }
@@ -75,9 +75,10 @@ const getConfirmTransaction = async (txid: string) => {
 while (true) {
   const [ usdcToSol, solToUsdc ] = await getQuotes()
   if (solToUsdc.outAmount > initial + 20300) {
-    console.log("Opportunity found on " + solToUsdc.marketInfos.id);
+    console.log("Opportunity found");
     await Promise.all(
       [usdcToSol, solToUsdc].map(async (route: DataQuote) => {
+        console.log("Route: " + route.fees)
         const swap: SwapResponse = await getTransaction(route);
         await Promise.all(
           [swap.setupTransaction, swap.swapTransaction, swap.cleanupTransaction]

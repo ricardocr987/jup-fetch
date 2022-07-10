@@ -10,7 +10,7 @@ export type DataQuote = {
     otherAmountThreshold: number,
     swapMode: number,
     priceImpactPct: number,
-    marketInfos: MarketInfos,
+    marketInfos: MarketInfos[],
     fees: Fees
 }
 

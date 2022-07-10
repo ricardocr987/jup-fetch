@@ -3,7 +3,6 @@ import promiseRetry from "promise-retry";
 import dotenv from "dotenv";
 import bs58 from "bs58";
 import { NodeWallet } from "nodewallet";
-import { QuoteResponse, DataQuote, SwapResponse } from "types"
 
 console.log({ dotenv });
 dotenv.config();
@@ -18,21 +17,21 @@ const wallet = new NodeWallet(
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+const pubkey = "7SZM2pvDUfonYmdPqxwaw8bp93JvUXWiWWyRSHfga2Q7"
+const initial = 10_000_000;
 
-const initial = 20_000_000;
-
-async function getQuotes(): Promise<[DataQuote, DataQuote]> {
+async function getQuotes(){
   const options = {
     method: "get",
   };
-  const usdcToSol: QuoteResponse = await (
+  const usdcToSol = await (
     await fetch(
       `https://quote-api.jup.ag/v1/quote?outputMint=${SOL_MINT}&inputMint=${USDC_MINT}&amount=${initial}&slippage=0.2`,
       options
     )
   ).json();
 
-  const solToUsdc: QuoteResponse = await (
+  const solToUsdc = await (
     await fetch(
       `https://quote-api.jup.ag/v1/quote?outputMint=${USDC_MINT}&inputMint=${SOL_MINT}&amount=${usdcToSol.data[0].outAmount}&slippage=0.2`,
       options
@@ -44,7 +43,7 @@ async function getQuotes(): Promise<[DataQuote, DataQuote]> {
   return [ usdcToSol.data[0], solToUsdc.data[0] ];
 }
 
-async function getTransaction(route: DataQuote): Promise<SwapResponse>{
+async function getTransaction(route, pubkey){
   return await (
     await fetch("https://quote-api.jup.ag/v1/swap", {
       method: "POST",
@@ -53,18 +52,33 @@ async function getTransaction(route: DataQuote): Promise<SwapResponse>{
       },
       body: JSON.stringify({
         route: route,
-        userPublicKey: "7SZM2pvDUfonYmdPqxwaw8bp93JvUXWiWWyRSHfga2Q7",
+        userPublicKey: pubkey,
         wrapUnwrapSOL: false,
       }),
     })
   ).json();
 }
 
-const getConfirmTransaction = async (txid: string) => {
+const getConfirmTransaction = async (txid) => {
   const res = await promiseRetry(
-      await connection.getTransaction(txid, {
+    async (retry) => {
+      let txResult = await connection.getTransaction(txid, {
         commitment: "confirmed",
-      })
+      });
+
+      if (!txResult) {
+        const error = new Error("Transaction was not confirmed");
+
+        retry(error);
+        return;
+      }
+      return txResult;
+    },
+    {
+      retries: 40,
+      minTimeout: 500,
+      maxTimeout: 1000,
+    }
   );
   if (res.meta.err) {
     throw new Error("Transaction failed");
@@ -74,23 +88,22 @@ const getConfirmTransaction = async (txid: string) => {
 
 while (true) {
   const [ usdcToSol, solToUsdc ] = await getQuotes()
-  if (solToUsdc.outAmount > initial + 20300) {
+  if (solToUsdc.outAmount > initial + 15000) {
     console.log("Opportunity found");
     await Promise.all(
-      [usdcToSol, solToUsdc].map(async (route: DataQuote) => {
-        console.log("Route: " + route.fees)
-        const swap: SwapResponse = await getTransaction(route);
+      [usdcToSol, solToUsdc].map(async (route) => {
+        const tx = await getTransaction(route, pubkey);
         await Promise.all(
-          [swap.setupTransaction, swap.swapTransaction, swap.cleanupTransaction]
+          [tx.setupTransaction, tx.swapTransaction, tx.cleanupTransaction]
             .filter(Boolean)
-            .map(async (serializedTransaction: string) => {
+            .map(async (serializedTransaction) => {
               // get transaction object from serialized transaction
               const transaction = Transaction.from(
                 Buffer.from(serializedTransaction, "base64")
               );
               // perform the swap
               // Transaction might failed or dropped
-              const txid: string = await connection.sendTransaction(
+              const txid = await connection.sendTransaction(
                 transaction,
                 [wallet.payer],
                 {

@@ -1,27 +1,50 @@
 import { Connection, Keypair, Transaction } from "@solana/web3.js";
-import { NodeWallet } from "./nodewallet";
 import promiseRetry from "promise-retry";
 import dotenv from "dotenv";
 import bs58 from "bs58";
-import { QuoteResponse } from "types"
+import { NodeWallet } from "nodewallet";
+import { QuoteResponse, DataQuote, SwapResponse } from "types"
 
 console.log({ dotenv });
 dotenv.config();
 
-async function getCoinQuote(inputMint, outputMint, amount) : Promise<QuoteResponse> {
+const connection = new Connection(
+  "https://solana--mainnet.datahub.figment.io/apikey/8868c4e6c98ea7b4b88ece5bf96ff7d5"
+);
+
+const wallet = new NodeWallet(
+  Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY || ""))
+);
+
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+const initial = 20_000_000;
+
+async function getQuotes(): Promise<[DataQuote, DataQuote]> {
   const options = {
     method: "get",
   };
-
-  return await (
+  const usdcToSol: QuoteResponse = await (
     await fetch(
-      `https://quote-api.jup.ag/v1/quote?outputMint=${outputMint}&inputMint=${inputMint}&amount=${amount}&swapMode=ExactIn&slippage=0&feeBps=0&onlyDirectRoutes=false`,
+      `https://quote-api.jup.ag/v1/quote?outputMint=${SOL_MINT}&inputMint=${USDC_MINT}&amount=${initial}&slippage=0.2`,
       options
     )
   ).json();
+  
+  const solToUsdc: QuoteResponse = await (
+    await fetch(
+      `https://quote-api.jup.ag/v1/quote?outputMint=${USDC_MINT}&inputMint=${SOL_MINT}&amount=${usdcToSol.data[0].outAmount}&slippage=0.2`,
+      options
+    )
+  ).json();
+
+  console.log("Output: " + solToUsdc.data[0].outAmount + " | Time taken: " + solToUsdc.timeTaken);
+
+  return [ usdcToSol.data[0], solToUsdc.data[0] ];
 }
 
-async function getTransaction(route, pubkey) {
+async function getTransaction(route: DataQuote): Promise<SwapResponse>{
   return await (
     await fetch("https://quote-api.jup.ag/v1/swap", {
       method: "POST",
@@ -30,24 +53,14 @@ async function getTransaction(route, pubkey) {
       },
       body: JSON.stringify({
         route: route,
-        userPublicKey: pubkey,
+        userPublicKey: "7SZM2pvDUfonYmdPqxwaw8bp93JvUXWiWWyRSHfga2Q7",
         wrapUnwrapSOL: false,
       }),
     })
   ).json();
 }
 
-const connection = new Connection(
-  "https://solana--mainnet.datahub.figment.io/apikey/8868c4e6c98ea7b4b88ece5bf96ff7d5"
-);
-const wallet = new NodeWallet(
-  Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY || ""))
-);
-
-const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const SOL_MINT = "7i5KKsX2weiTkry7jA4ZwSuXGhs5eJBEjY8vVxR4pfRx";
-
-const getConfirmTransaction = async (txid) => {
+const getConfirmTransaction = async (txid: string) => {
   const res = await promiseRetry(
       await connection.getTransaction(txid, {
         commitment: "confirmed",
@@ -59,37 +72,24 @@ const getConfirmTransaction = async (txid) => {
   return txid;
 };
 
-//await createWSolAccount();
-
-// 20 USDC for quote
-const initial = 10_000_000;
-const pubKey = "7SZM2pvDUfonYmdPqxwaw8bp93JvUXWiWWyRSHfga2Q7";
-
 while (true) {
-  const usdcToSol: QuoteResponse = await getCoinQuote(USDC_MINT, SOL_MINT, initial);
-  const solToUsdc: QuoteResponse = await getCoinQuote(
-    SOL_MINT,
-    USDC_MINT,
-    usdcToSol.data[0].outAmount
-  );
-  console.log(usdcToSol.timeTaken, solToUsdc.timeTaken);
-
-  // when outAmount more than initial
-  if (solToUsdc.data[0].outAmount > initial) {
+  const [ usdcToSol, solToUsdc ] = await getQuotes()
+  if (solToUsdc.outAmount > initial + 20300) {
+    console.log("Opportunity found on " + solToUsdc.marketInfos.id);
     await Promise.all(
-      [usdcToSol, solToUsdc].map(async (route) => {
-        const tx = await getTransaction(route, pubKey);
+      [usdcToSol, solToUsdc].map(async (route: DataQuote) => {
+        const swap: SwapResponse = await getTransaction(route);
         await Promise.all(
-          [tx.setupTransaction, tx.swapTransaction, tx.cleanupTransaction]
+          [swap.setupTransaction, swap.swapTransaction, swap.cleanupTransaction]
             .filter(Boolean)
-            .map(async (serializedTransaction) => {
+            .map(async (serializedTransaction: string) => {
               // get transaction object from serialized transaction
               const transaction = Transaction.from(
                 Buffer.from(serializedTransaction, "base64")
               );
               // perform the swap
               // Transaction might failed or dropped
-              const txid = await connection.sendTransaction(
+              const txid: string = await connection.sendTransaction(
                 transaction,
                 [wallet.payer],
                 {
@@ -108,82 +108,3 @@ while (true) {
     );
   }
 }
-
-// retrieve indexed routed map
-/*const indexedRouteMap = await (
-  await fetch("https://quote-api.jup.ag/v1/indexed-route-map")
-).json();
-const getMint = (index) => indexedRouteMap["mintKeys"][index];
-const getIndex = (mint) => indexedRouteMap["mintKeys"].indexOf(mint);
-
-// generate route map by replacing indexes with mint addresses
-var generatedRouteMap = {};
-Object.keys(indexedRouteMap["indexedRouteMap"]).forEach((key, index) => {
-  generatedRouteMap[getMint(key)] = indexedRouteMap["indexedRouteMap"][key].map(
-    (index) => getMint(index)
-  );
-});
-
-// list all possible input tokens by mint Address
-const allInputMints = Object.keys(generatedRouteMap);
-
-// list tokens can swap by mint addressfor SOL
-const swappableOutputForSol =
-  generatedRouteMap["So11111111111111111111111111111111111111112"];
-console.log({ allInputMints, swappableOutputForSol });*/
-
-// wsol account
-/*const createWSolAccount = async () => {
-  const wsolAddress = await Token.getAssociatedTokenAddress(
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    TOKEN_PROGRAM_ID,
-    new PublicKey(SOL_MINT),
-    wallet.publicKey
-  );
-
-  const wsolAccount = await connection.getAccountInfo(wsolAddress);
-
-  if (!wsolAccount) {
-    const transaction = new Transaction({
-      feePayer: wallet.publicKey,
-    });
-    const instructions = [];
-
-    instructions.push(
-      await Token.createAssociatedTokenAccountInstruction(
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-        TOKEN_PROGRAM_ID,
-        new PublicKey(SOL_MINT),
-        wsolAddress,
-        wallet.publicKey,
-        wallet.publicKey
-      )
-    );
-
-    // fund 1 sol to the account
-    instructions.push(
-      SystemProgram.transfer({
-        fromPubkey: wallet.publicKey,
-        toPubkey: wsolAddress,
-        lamports: 100_000_000, // 0.1 sol
-      })
-    );
-
-    instructions.push(
-      // This is not exposed by the types, but indeed it exists
-      Token.createSyncNativeInstruction(TOKEN_PROGRAM_ID, wsolAddress)
-    );
-
-    transaction.add(...instructions);
-    transaction.recentBlockhash = await (
-      await connection.getLatestBlockhash()
-    ).blockhash;
-    transaction.partialSign(wallet.payer);
-    const result = await connection.sendTransaction(transaction, [
-      wallet.payer,
-    ]);
-    console.log({ result });
-  }
-
-  return wsolAccount;
-};*/

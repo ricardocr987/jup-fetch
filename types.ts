@@ -3,7 +3,7 @@ export type QuoteResponse = {
     timeTaken: number
 }
 
-type DataQuote = {
+export type DataQuote = {
     inAmount: number,
     outAmount: number,
     amount: number,
@@ -15,10 +15,10 @@ type DataQuote = {
 }
 
 type MarketInfos = {
-    id: String,
-    label: String,
-    inputMint: String,
-    outputMint: String,
+    id: string,
+    label: string,
+    inputMint: string,
+    outputMint: string,
     notEnoughLiquidity: boolean,
     inAmount: number,
     outAmount: number,
@@ -29,13 +29,13 @@ type MarketInfos = {
 
 type LpFee = {
     amount: number,
-    mint: String,
+    mint: string,
     pct: number
 }
 
 type PlatformFee = {
     amount: number,
-    mint: String,
+    mint: string,
     pct: number
 }
 
@@ -45,4 +45,10 @@ type Fees = {
     ataDeposits: [],
     totalFeeAndDeposits: number,
     minimumSOLForTransaction: number
+}
+
+export type SwapResponse = {
+    setupTransaction: string,
+    swapTransaction: string,
+    cleanupTransaction: string
 }

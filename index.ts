@@ -8,7 +8,7 @@ console.log({ dotenv });
 dotenv.config();
 
 const connection = new Connection(
-  "https://solana--mainnet.datahub.figment.io/apikey/8868c4e6c98ea7b4b88ece5bf96ff7d5"
+  ""
 );
 
 const wallet = new NodeWallet(
@@ -18,7 +18,7 @@ const wallet = new NodeWallet(
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const initial = 50_000_000;
-const minimal_output = initial * 1.0015
+const minimal_output = initial * 1.0015;
 const profit_wanted = minimal_output / 1000000;
 
 const indexedRoute = await getIndexedRoutes();
@@ -32,9 +32,10 @@ for (const intermediate in INDEXES_INTERMEDIATE) {
 }
 
 async function getIndexedRoutes(){
+  const url = "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=true"
   return await (
     await fetch(
-      "https://quote-api.jup.ag/v1/indexed-route-map?onlyDirectRoutes=true", {
+      url, {
         method: "GET",
       }
     )
@@ -42,17 +43,19 @@ async function getIndexedRoutes(){
 }
 
 async function getQuotes(){
+  const url1 = `https://quote-api.jup.ag/v1/quote?outputMint=${SOL_MINT}&inputMint=${USDC_MINT}&amount=${initial}`//&onlyDirectRoutes=true
   const usdcToSol = await (
     await fetch(
-      `https://quote-api.jup.ag/v1/quote?outputMint=${SOL_MINT}&inputMint=${USDC_MINT}&amount=${initial}`, { //&onlyDirectRoutes=true
+      url1, { 
         method: "GET",
       }
     )
   ).json();
 
+  const url2 = `https://quote-api.jup.ag/v1/quote?outputMint=${USDC_MINT}&inputMint=${SOL_MINT}&amount=${usdcToSol.data[0].outAmount}`
   const solToUsdc = await (
     await fetch(
-      `https://quote-api.jup.ag/v1/quote?outputMint=${USDC_MINT}&inputMint=${SOL_MINT}&amount=${usdcToSol.data[0].outAmount}`, {
+      url2, {
         method: "GET",
       }
     )
@@ -64,7 +67,7 @@ async function getQuotes(){
 }
 
 async function getTransaction(route){
-  return await (
+  const tx = await (
     await fetch("https://quote-api.jup.ag/v1/swap", {
       method: "POST",
       headers: {
@@ -77,14 +80,22 @@ async function getTransaction(route){
       }),
     })
   ).json();
+
+  return [ tx.setupTransaction, tx.swapTransaction, tx.cleanupTransaction ]
 }
 
 const getConfirmTransaction = async (txid) => {
   const res = await promiseRetry(
-    async () => {
+    async (retry) => {
       let txResult = await connection.getTransaction(txid, {
         commitment: "confirmed",
       });
+      if (!txResult) {
+        const error = new Error("Transaction was not confirmed");
+
+        retry(error);
+        return;
+      }
       return txResult;
     },
     {
@@ -105,18 +116,14 @@ while (true) {
     console.log("Opportunity found");
     await Promise.all(
       [usdcToSol, solToUsdc].map(async (route) => {
-        const tx = await getTransaction(route);
-        console.log(tx);
+        const [ setupTransaction, swapTransaction, cleanupTransaction ] = await getTransaction(route);
         await Promise.all(// i think setupTx creates necessary ATA's and cleanupTx closes it, if the necessary ATA's are already created you will get those attributes as undefined
-          [tx.setupTransaction, tx.swapTransaction, tx.cleanupTransaction]
+          [setupTransaction, swapTransaction, cleanupTransaction]
             .filter(Boolean)
             .map(async (serializedTransaction) => {
-              // get transaction object from serialized transaction
               const transaction = Transaction.from(
                 Buffer.from(serializedTransaction, "base64")
               );
-              // perform the swap
-              // Transaction might failed or dropped
               const txid = await connection.sendTransaction(
                 transaction,
                 [wallet.payer],
